@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Guide — Indoor Navigation</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{margin:0;background:#f2f6fb;color:#123}
+header{background:#0b5fa5;color:#fff;padding:16px;display:flex;align-items:center;gap:12px}
+header h1{font-size:20px;margin:0}
+header p{margin:2px 0 0;font-size:12px;opacity:.9}
+.app{max-width:430px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 20px rgba(0,0,0,.08)}
+.screen{display:none;padding:18px}
+.screen.active{display:block}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(16,42,67,.06)}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:16px;font-size:17px;font-weight:bold;margin-bottom:12px;cursor:pointer}
+.primary{background:#0b5fa5;color:#fff}
+.green{background:#128a4b;color:#fff}
+.red{background:#d64545;color:#fff}
+.grey{background:#eef2f7;color:#123}
+.mic{background:#111;color:#fff;border-radius:50%;width:76px;height:76px;font-size:30px;margin:12px auto;display:flex;align-items:center;justify-content:center;border:4px solid #0b5fa5}
+input,select{width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:12px;font-size:16px;margin-bottom:12px}
+label{font-weight:bold;font-size:14px;display:block;margin-bottom:6px}
+.route{background:#eaf4ff;border-left:6px solid #0b5fa5;padding:12px;border-radius:10px;margin-bottom:10px;font-size:15px}
+.badge{display:inline-block;background:#e6f4ea;color:#128a4b;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:bold;margin-right:6px}
+.map{height:250px;background:linear-gradient(#f8fafc,#e8f0fa);border:1px dashed #9db4c8;border-radius:14px;position:relative;overflow:hidden}
+.dot{position:absolute;width:20px;height:20px;background:#0b5fa5;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 3px rgba(11,95,165,.25)}
+.dest{position:absolute;width:22px;height:22px;background:#d64545;border-radius:50%;border:3px solid #fff}
+.path{position:absolute;height:6px;background:#0b5fa5;opacity:.7;border-radius:4px}
+.helpbar{position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;background:#fff;border-top:1px solid #e2e8f0;padding:12px;display:flex;gap:10px}
+.helpbar button{flex:1;padding:14px;border:0;border-radius:12px;font-weight:bold;cursor:pointer}
+.care{background:#7c3aed;color:#fff}
+.nav{background:#0b5fa5;color:#fff}
+footer{padding:14px;text-align:center;font-size:12px;color:#64748b}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<div style="font-size:30px">🏥</div>
+<div><h1>Hospital Guide</h1><p>Appointment-based indoor navigation</p></div>
+</header>
+
+<section id="home" class="screen active">
+<div class="card">
+<h2>Welcome</h2>
+<p>Find your appointment, department, lab, pharmacy, or restroom inside the hospital.</p>
+</div>
+<button class="btn primary" onclick="show('appointment')">📅 I have an appointment</button>
+<button class="btn grey" onclick="show('search')">🔍 I am a visitor</button>
+<button class="btn grey" onclick="show('access')">♿ Set accessibility needs</button>
+<div class="card">
+<h3>Voice Assistant</h3>
+<p>Tap the microphone and say:</p>
+<ul>
+<li>“Where is my appointment?”</li>
+<li>“Take me to radiology.”</li>
+<li>“I need a wheelchair-friendly route.”</li>
+<li>“Call for help.”</li>
+</ul>
+<div class="mic" onclick="voice()">🎤</div>
+<p id="voiceText" style="text-align:center;font-weight:bold"></p>
+</div>
+</section>
+
+<section id="appointment" class="screen">
+<h2>Find Appointment</h2>
+<div class="card">
+<label>Appointment ID / Mobile number</label>
+<input id="aptId" placeholder="Enter APT-1234 or mobile number">
+<label>Appointment QR code</label>
+<button class="btn grey" onclick="scanQR()">📷 Scan Appointment QR</button>
+<button class="btn primary" onclick="findAppointment()">Find My Route</button>
+</div>
+<button class="btn grey" onclick="show('home')">← Back</button>
+</section>
+
+<section id="search" class="screen">
+<h2>Visitor Navigation</h2>
+<div class="card">
+<label>Where do you want to go?</label>
+<select id="dest">
+<option>Radiology</option>
+<option>Cardiology</option>
+<option>Laboratory</option>
+<option>Pharmacy</option>
+<option>OPD Block B</option>
+<option>Restroom</option>
+<option>Information Desk</option>
+</select>
+<button class="btn primary" onclick="startNavigation()">Start Navigation</button>
+</div>
+<button class="btn grey" onclick="show('home')">← Back</button>
+</section>
+
+<section id="access" class="screen">
+<h2>Accessibility Needs</h2>
+<div class="card">
+<label>Select your preference</label>
+<select id="accessType">
+<option>Standard route</option>
+<option>Wheelchair-friendly route</option>
+<option>Elderly-friendly route</option>
+<option>Visually impaired: voice guidance</option>
+<option>Hearing impaired: visual guidance</option>
+<option>Simple route with fewer turns</option>
+</select>
+<button class="btn primary" onclick="saveAccess()">Save Preference</button>
+<p id="accessSaved"></p>
+</div>
+<button class="btn grey" onclick="show('home')">← Back</button>
+</section>
+
+<section id="navigate" class="screen">
+<h2>Navigating</h2>
+<div class="card">
+<span class="badge" id="accessBadge">Standard route</span>
+<span class="badge">Indoor GPS</span>
+<h3 id="destinationName">Radiology</h3>
+<div class="map" id="map">
+<div class="path" style="left:40px;top:200px;width:220px"></div>
+<div class="path" style="left:250px;top:100px;width:6px;height:106px"></div>
+<div class="path" style="left:250px;top:100px;width:120px"></div>
+<div class="dot" id="userDot" style="left:30px;top:190px"></div>
+<div class="dest" style="left:360px;top:90px"></div>
+</div>
+<div class="route" id="nextStep">Walk straight for 20 metres.</div>
+<button class="btn grey" onclick="nextStep()">Next Direction</button>
+<button class="btn grey" onclick="repeatStep()">🔁 Repeat Direction</button>
+</div>
+<div class="helpbar">
+<button class="care" onclick="inviteCaregiver()">👨‍👩‍👧 Caregiver</button>
+<button class="red" onclick="requestHelp()">🆘 Need Help?</button>
+<button class="nav" onclick="show('home')">✖ End</button>
+</div>
+</section>
+
+<section id="help" class="screen">
+<h2>Request Assistance</h2>
+<div class="card">
+<p>Your location and destination will be shared with hospital staff.</p>
+<button class="btn red" onclick="sendHelp('Hospital volunteer / escort')">🧑‍⚕️ Request Volunteer</button>
+<button class="btn red" onclick="sendHelp('Wheelchair support')">♿ Request Wheelchair</button>
+<button class="btn red" onclick="sendHelp('Hospital helpdesk call')">📞 Call Helpdesk</button>
+<button class="btn grey" onclick="show('navigate')">← Back to Navigation</button>
+</div>
+</section>
+
+<section id="caregiver" class="screen">
+<h2>Caregiver Access</h2>
+<div class="card">
+<label>Caregiver mobile number</label>
+<input id="careNumber" placeholder="Enter caregiver mobile number">
+<button class="btn primary" onclick="shareLocation()">Share My Route</button>
+<p id="careStatus"></p>
+</div>
+<div class="card">
+<h3>Permissions</h3>
+<p><input type="checkbox" id="liveLoc" checked> Share live location</p>
+<p><input type="checkbox" id="helpAlert" checked> Send assistance alerts</p>
+<p><input type="checkbox" id="routeView" checked> Allow route viewing</p>
+</div>
+<button class="btn grey" onclick="show('navigate')">← Back</button>
+</section>
+
+<footer>Hospital Guide prototype • BLE beacons, QR checkpoints and appointment integration are simulated.</footer>
+</div>
+
+<script>
+let access='Standard route';
+let steps=['Walk straight for 20 metres.','Turn left after the pharmacy.','Take Lift B to the second floor.','Turn right near the information desk.','Your destination is on your right.'];
+let stepIndex=0;
+let currentDest='Radiology';
+
+function show(id){
+ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+ document.getElementById(id).classList.add('active');
+ window.scrollTo(0,0);
+}
+
+function scanQR(){
+ document.getElementById('aptId').value='APT-1234';
+ alert('Appointment QR scanned successfully.');
+}
+
+function findAppointment(){
+ const v=document.getElementById('aptId').value.trim();
+ if(!v){alert('Please enter appointment ID or mobile number.');return;}
+ currentDest='Cardiology — OPD Block B, Room 214';
+ startNavigation();
+}
+
+function startNavigation(){
+ currentDest=document.getElementById('dest')?.value||currentDest;
+ document.getElementById('destinationName').innerText=currentDest;
+ document.getElementById('accessBadge').innerText=access;
+ stepIndex=0;
+ document.getElementById('nextStep').innerText=steps[0];
+ show('navigate');
+ speak(steps[0]);
+}
+
+function saveAccess(){
+ access=document.getElementById('accessType').value;
+ document.getElementById('accessSaved').innerText='Saved: '+access;
+ alert('Accessibility preference saved.');
+}
+
+function nextStep(){
+ stepIndex=(stepIndex+1)%steps.length;
+ const text=steps[stepIndex];
+ document.getElementById('nextStep').innerText=text;
+ moveDot();
+ speak(text);
+}
+
+function repeatStep(){
+ speak(document.getElementById('nextStep').innerText);
+}
+
+function moveDot(){
+ const dot=document.getElementById('userDot');
+ const positions=[[30,190],[120,190],[240,190],[240,90],[300,90]];
+ const [x,y]=positions[stepIndex%positions.length];
+ dot.style.left=x+'px'; dot.style.top=y+'px';
+}
+
+function speak(text){
+ if('speechSynthesis' in window){
+  const u=new SpeechSynthesisUtterance(text);
+  speechSynthesis.speak(u);
+ }
+}
+
+function voice(){
+ const commands={
+  'appointment':'Finding your appointment route.',
+  'radiology':'Starting accessible navigation to Radiology.',
+  'wheelchair':'Wheelchair-friendly route selected.',
+  'help':'Opening assistance request.'
+ };
+ const said=prompt('Simulate voice command:\n1. Where is my appointment?\n2. Take me to radiology\n3. I need a wheelchair-friendly route\n4. Call for help');
+ if(!said)return;
+ const s=said.toLowerCase();
+ document.getElementById('voiceText').innerText='“'+said+'”';
+ if(s.includes('appointment')){findAppointment();}
+ else if(s.includes('radiology')){currentDest='Radiology';startNavigation();}
+ else if(s.includes('wheelchair')){access='Wheelchair-friendly route';alert('Wheelchair-friendly route selected.');}
+ else if(s.includes('help')){show('help');}
+ else alert('Sorry, I did not understand. Please try again.');
+}
+
+function requestHelp(){show('help');}
+
+function sendHelp(type){
+ const loc=['Main Entrance','Lift Lobby B','Corridor 2','OPD Block B'][stepIndex%4];
+ alert(type+' request sent.\n\nLocation: '+loc+'\nDestination: '+currentDest+'\nAccessibility: '+access);
+ if(document.getElementById('helpAlert').checked && document.getElementById('careNumber').value){
+  alert('Caregiver notified: '+document.getElementById('careNumber').value);
+ }
+ show('navigate');
+}
+
+function inviteCaregiver(){show('caregiver');}
+
+function shareLocation(){
+ const n=document.getElementById('careNumber').value.trim();
+ if(!n){alert('Enter caregiver mobile number.');return;}
+ document.getElementById('careStatus').innerText='Secure route-sharing link sent to '+n+'. Live location sharing is active until you end navigation.';
+ alert('Caregiver access request sent with your permission.');
+}
+</script>
+</body>
+</html>
